@@ -1,0 +1,225 @@
+<html lang="en">
+<head>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.0/jquery.min.js" type="text/javascript"></script>
+<title>Wallboard</title>
+<style type="text/css">
+body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+iframe { border: none; }
+</style>
+<script type="text/javascript">
+var Dash = {
+    currentDashIndex: -1,
+
+    /**
+     * Default settings for the dashboards
+     */
+    dashDefaults: {
+        /**
+         * How long (in ms) before display should each dashboard be loaded in the background
+         */
+        loadDelay: 2000,
+        /**
+         * How long (in sec) each dashboard should be displayed
+         */
+        time: 15,
+        /**
+         * How long (in ms) should the fade animation run
+         */
+        fadeDelay: 800
+    },
+
+    /**
+     * List of dashboard views to cycle through
+     *
+     * Required Parameters:
+     *   url: The url to load
+     *
+     * Optional Parameters:
+     *   rootElement: jQuery selector for the element that should be the "root" of the displayed page. The
+     *       script will find the root element and walk up the tree removing all elements that are not direct
+     *       parents of the specified root.
+     *   removeElements: array of jQuery selectors that should be removed from the displayed page
+     *   scroll: boolean, if true the loaded page will be scrolled from the top to the bottom
+     */
+    dashboards: [
+        /**
+         * Pulls in the Jira Wallboard Plugin, in this example rapidView 181 is shown
+         */
+        {
+            url: "https://jira.example.com/jira/plugins/servlet/gadgets/ifr?container=atlassian&view=wallboard&up_isConfigured=true&up_rapidViewId=181&url=https%3A%2F%2Fjira.example.com%2Fjira%2Frest%2Fgadgets%2F1.0%2Fg%2Fcom.pyxis.greenhopper.jira%3Agreenhopper-gadget-rapid-view%2Fgadgets%2Fgreenhopper-rapid-view.xml",
+            removeElements: ['#ghx-column-header-group', '#ghx-column-header-group-stalker'],
+            username: 'os_username=USERNAME',
+            password: 'os_password=PASSWORD'
+        },
+        /**
+         * Pulls in the Greenhopper RapidBoard Burndown Chart for rapidView 121
+         */
+        {
+            url: "https://jira.example.com/jira/secure/RapidBoard.jspa?rapidView=121&view=reporting&chart=burndownChart",
+            rootElement: "#ghx-chart-group",
+            removeElements: ['#ghx-chart-controls-group', '#ghx-chart-controls-group', '#ghx-chart-data'],
+            username: 'os_username=USERNAME',
+            password: 'os_password=PASSWORD'
+        },
+        /**
+         * Pulls in the Jenkins walldisplay plugin rendering of the Wallboard view tab
+         */
+        {
+            url: "https://my-tools.example.com/jenkins/plugin/jenkinswalldisplay/walldisplay.html?jenkinsUpdateInterval=10&viewName=Wallboard&jenkinsUrl=https%3A%2F%2Fmy-tools.example.com%2Fjenkins%2F"
+        },
+        /**
+         * Pulls in a custom status dashboard
+         */
+        {
+            url: "https://my-tools.example.com/mumstatus/index.jsp?zoom=1.5",
+        }
+    ],
+    setup: function() {
+    	//Merge the dashboard configs with the default configs
+        $(Dash.dashboards).each(function(i) {
+            var mergedSettings = {}
+            $.extend(mergedSettings, Dash.dashDefaults, Dash.dashboards[i]);
+            Dash.dashboards[i] = mergedSettings;
+        });
+
+        // Preload next page, as it takes time to load the dynamic data
+        Dash.preloadNextPage((Dash.currentDashIndex + 1) % Dash.dashboards.length);
+    },
+
+    display: function(newDashIndex, newDash) {
+        console.log("JD: Displaying new dashboard: " + newDashIndex);
+
+        //If this is the first dashboard being displayed just show it
+        if (Dash.currentDashIndex < 0) {
+            console.log("JD: First Dashboard, showing: " + newDashIndex);
+
+            newDash.iframe.fadeIn(newDash.fadeDelay, function() { Dash.applyDashEffects(newDash); });
+        }
+        //Otherwise fade out the old dash and fade in the new dash
+        else {
+            console.log("JD: Hiding dash " + Dash.currentDashIndex + " and showing " + newDashIndex);
+
+            var oldDash = Dash.dashboards[Dash.currentDashIndex];
+            oldDash.iframe.fadeOut(newDash.fadeDelay, function() {
+                oldDash.iframe.remove();
+                delete oldDash.iframe;
+            });
+            newDash.iframe.fadeIn(newDash.fadeDelay, function() { Dash.applyDashEffects(newDash); });
+        }
+
+        //Update our tracker to the current dashboard index
+        Dash.currentDashIndex = newDashIndex;
+        console.log("JD: Updated current dash index to: " + Dash.currentDashIndex);
+
+        //Calculate the next dashboard index and set a timeout to start preloading it for display
+        var nextDashIndex = (Dash.currentDashIndex + 1) % Dash.dashboards.length;
+        var preloadDelay = (newDash.time * 1000) - Dash.dashboards[nextDashIndex].loadDelay;
+
+        console.log("JD: Setting preload timeout for dash " + nextDashIndex + " to " + preloadDelay + "ms");
+        setTimeout(function() { Dash.preloadNextPage(nextDashIndex); }, preloadDelay);
+    },
+
+    applyDashEffects: function(dash) {
+        if (dash.scroll) {
+            //this works even cross-context
+            var iframeHeight = dash.iframe.contents().height();
+            console.log("HEIGHT: " + iframeHeight);
+
+            var animateOpts = {
+                scrollTop: iframeHeight - $(window).height()
+            };
+            dash.iframe.contents().find("html, body").animate(animateOpts, { duration: (dash.time * 1000) - dash.fadeDelay });
+        }
+    },
+
+    preloadNextPage: function(nextDashIndex) {
+        //Select the dashboard to preload
+        var nextDash = Dash.dashboards[nextDashIndex];
+        console.log("JD: Preloading dashboard: " + nextDashIndex);
+
+        //If the dashboard's iframe doesn't yet exist create it and add it to the body
+        if (nextDash.iframe == undefined) {
+            nextDash.iframe = $("<iframe/>");
+            nextDash.iframe.attr("height", "100%");
+            nextDash.iframe.attr("width", "100%");
+            nextDash.iframe.attr("id", "dashFrame" + nextDashIndex);
+            nextDash.iframe.appendTo("body");
+            nextDash.iframe.fadeOut(1);
+
+            console.log("JD: Created iframe for dashboard: " + nextDashIndex);
+        }
+
+        console.log("JD: Started load of dashboard : " + nextDashIndex + " to " + nextDash.url);
+
+        var nextUrl = nextDash.url;
+        if (nextDash.username != undefined) {
+            nextUrl += "&" + nextDash.username;
+        }
+        if (nextDash.password != undefined) {
+            nextUrl += "&" + nextDash.password;
+        }
+
+        nextDash.iframe.attr("src", nextUrl);
+
+        setTimeout(function() { Dash.cleanupFrame(nextDashIndex, nextDash); }, nextDash.loadDelay);
+    },
+
+    cleanupFrame: function(nextDashIndex, nextDash) {
+        if (nextDash.rootElement != undefined) {
+            var rootElement = $(nextDash.rootElement, nextDash.iframe.contents());
+            Dash.trimOtherElements(rootElement);
+        }
+
+        if (nextDash.removeElements != undefined) {
+            $(nextDash.removeElements).each(function(i, selector) {
+                $(selector, nextDash.iframe.contents()).remove();
+            });
+        }
+
+        if (nextDash.css != undefined) {
+            console.log(nextDash.css);
+            nextDash.css.forEach(function(sel) {
+                console.log("JD: Applying CSS rules to - " + sel.selector);
+                console.log(sel);
+                var elem = $(sel.selector, nextDash.iframe.contents());
+                sel.css.forEach(function(rule) {
+                    elem.css(rule.name, rule.value);
+                });
+            });
+        }
+
+        console.log("JD: Cleaned up dashboard frame: " + nextDashIndex);
+        Dash.display(nextDashIndex, nextDash);
+    },
+    trimOtherElements: function(elem) {
+        if (elem.prop("tagName") == undefined) {
+            return;
+        }
+        console.log("TRIM: " + elem.prop("tagName"));
+        var e = elem.get(0);
+        var parent = elem.parent();
+        var children = parent.children();
+        children.each(function(i, child) {
+            if (child !== e) {
+                console.log("DELETE: " + child);
+                $(child).remove();
+            }
+        });
+
+        if (!parent.is("body")) {
+            Dash.trimOtherElements(parent);
+        }
+    }
+};
+
+$(function() {
+    Dash.setup();
+});
+</script>
+</head>
+<body>
+</body>
+</html>
+
+
+
