@@ -68,6 +68,33 @@ var Dash = {
             url: "https://my-tools.example.com/jenkins/plugin/jenkinswalldisplay/walldisplay.html?jenkinsUpdateInterval=10&viewName=Wallboard&jenkinsUrl=https%3A%2F%2Fmy-tools.example.com%2Fjenkins%2F"
         },
         /**
+         * Pulls in bus times from the excellent www.smsmybus.com and further customizes
+         * the kiosk view.
+         *
+         * Uses the `cleanupCb` option to modify page content, and apply calculated styles.
+         *
+         * Uses the `between` option to only display bus times during business hours (8AM - 5PM).
+         */
+        {
+            url: "http://www.smsmybus.com/kiosk?s=6220,&d=Westbound,",
+            removeElements: ['.col2', '#footer'],
+            css: [
+                { selector: '.col1', css: {'width': '100%'} },
+                { selector: '.colleft', css: {'background': 'inherit'} }
+            ],
+            cleanupCb: function(){
+                var frame = this.iframe.contents();
+
+                $('#header', frame).text('Park St Stop');
+                $('.colmask', frame).css({
+                  'height': ($(window).height() -
+                            ($('#header', frame).height() + 1)) +
+                            'px'
+                });
+            },
+            between: [8,17]
+        },
+        /**
          * Pulls in a custom status dashboard
          */
         {
@@ -95,6 +122,10 @@ var Dash = {
 
             newDash.iframe.fadeIn(newDash.fadeDelay, function() { Dash.applyDashEffects(newDash); });
         }
+        //In case we only have one board, do nothing
+        else if( Dash.currentDashIndex === newDashIndex ) {
+            console.log("JD: Same dash, doing nothing");
+        }
         //Otherwise fade out the old dash and fade in the new dash
         else {
             console.log("JD: Hiding dash " + Dash.currentDashIndex + " and showing " + newDashIndex);
@@ -113,6 +144,17 @@ var Dash = {
 
         //Calculate the next dashboard index and set a timeout to start preloading it for display
         var nextDashIndex = (Dash.currentDashIndex + 1) % Dash.dashboards.length;
+        var now = new Date();
+        while(true){
+            if( !Dash.dashboards[nextDashIndex].between ||
+                (Dash.dashboards[nextDashIndex].between[0] <= now.getHours() + 1 &&
+                Dash.dashboards[nextDashIndex].between[1] > now.getHours() + 1 ))
+            {
+                break;
+            }
+
+            nextDashIndex = (nextDashIndex + 1) % Dash.dashboards.length;
+        }
         var preloadDelay = (newDash.time * 1000) - Dash.dashboards[nextDashIndex].loadDelay;
 
         console.log("JD: Setting preload timeout for dash " + nextDashIndex + " to " + preloadDelay + "ms");
@@ -181,11 +223,12 @@ var Dash = {
             nextDash.css.forEach(function(sel) {
                 console.log("JD: Applying CSS rules to - " + sel.selector);
                 console.log(sel);
-                var elem = $(sel.selector, nextDash.iframe.contents());
-                sel.css.forEach(function(rule) {
-                    elem.css(rule.name, rule.value);
-                });
+                $(sel.selector, nextDash.iframe.contents()).css(sel.css);
             });
+        }
+
+        if (nextDash.cleanupCb != undefined) {
+            nextDash.cleanupCb();
         }
 
         console.log("JD: Cleaned up dashboard frame: " + nextDashIndex);
