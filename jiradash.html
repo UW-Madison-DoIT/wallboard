@@ -200,6 +200,10 @@ var Dash = {
             });
         }
 
+        if (nextDash.cleanupCb != undefined) {
+            nextDash.cleanupCb();
+        }
+
         console.log("JD: Cleaned up dashboard frame: " + nextDashIndex);
         Dash.display(nextDashIndex, nextDash);
     },
