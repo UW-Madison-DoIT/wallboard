@@ -68,6 +68,33 @@ var Dash = {
             url: "https://my-tools.example.com/jenkins/plugin/jenkinswalldisplay/walldisplay.html?jenkinsUpdateInterval=10&viewName=Wallboard&jenkinsUrl=https%3A%2F%2Fmy-tools.example.com%2Fjenkins%2F"
         },
         /**
+         * Pulls in bus times from the excellent www.smsmybus.com and further customizes
+         * the kiosk view.
+         *
+         * Uses the `cleanupCb` option to modify page content, and apply calculated styles.
+         *
+         * Uses the `between` option to only display bus times during business hours (8AM - 5PM).
+         */
+        {
+            url: "http://www.smsmybus.com/kiosk?s=6220,&d=Westbound,",
+            removeElements: ['.col2', '#footer'],
+            css: [
+                { selector: '.col1', css: {'width': '100%'} },
+                { selector: '.colleft', css: {'background': 'inherit'} }
+            ],
+            cleanupCb: function(){
+                var frame = this.iframe.contents();
+
+                $('#header', frame).text('Park St Stop');
+                $('.colmask', frame).css({
+                  'height': ($(window).height() -
+                            ($('#header', frame).height() + 1)) +
+                            'px'
+                });
+            },
+            between: [8,17]
+        },
+        /**
          * Pulls in a custom status dashboard
          */
         {
