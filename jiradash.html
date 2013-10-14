@@ -95,6 +95,10 @@ var Dash = {
 
             newDash.iframe.fadeIn(newDash.fadeDelay, function() { Dash.applyDashEffects(newDash); });
         }
+        //In case we only have one board, do nothing
+        else if( Dash.currentDashIndex === newDashIndex ) {
+            console.log("JD: Same dash, doing nothing");
+        }
         //Otherwise fade out the old dash and fade in the new dash
         else {
             console.log("JD: Hiding dash " + Dash.currentDashIndex + " and showing " + newDashIndex);
