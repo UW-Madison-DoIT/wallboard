@@ -196,10 +196,7 @@ var Dash = {
             nextDash.css.forEach(function(sel) {
                 console.log("JD: Applying CSS rules to - " + sel.selector);
                 console.log(sel);
-                var elem = $(sel.selector, nextDash.iframe.contents());
-                sel.css.forEach(function(rule) {
-                    elem.css(rule.name, rule.value);
-                });
+                $(sel.selector, nextDash.iframe.contents()).css(sel.css);
             });
         }
 
