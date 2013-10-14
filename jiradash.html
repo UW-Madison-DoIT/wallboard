@@ -117,6 +117,17 @@ var Dash = {
 
         //Calculate the next dashboard index and set a timeout to start preloading it for display
         var nextDashIndex = (Dash.currentDashIndex + 1) % Dash.dashboards.length;
+        var now = new Date();
+        while(true){
+            if( !Dash.dashboards[nextDashIndex].between ||
+                (Dash.dashboards[nextDashIndex].between[0] <= now.getHours() + 1 &&
+                Dash.dashboards[nextDashIndex].between[1] > now.getHours() + 1 ))
+            {
+                break;
+            }
+
+            nextDashIndex = (nextDashIndex + 1) % Dash.dashboards.length;
+        }
         var preloadDelay = (newDash.time * 1000) - Dash.dashboards[nextDashIndex].loadDelay;
 
         console.log("JD: Setting preload timeout for dash " + nextDashIndex + " to " + preloadDelay + "ms");
